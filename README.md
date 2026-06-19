@@ -100,18 +100,20 @@ Inject `NpgsqlDataSource` / `MySqlDataSource` (or a `DbConnection`) anywhere.
 
 ### Auto-starting proxies from configuration
 
-To start a loopback proxy for several instances automatically at startup — the in-process
-equivalent of the Cloud SQL Auth Proxy binary's `--instances` list — list them in
-`ConnectorOptions.Instances`. Registering the connector adds a hosted service that binds a
-`127.0.0.1` listener per instance before the app serves requests.
+To start a proxy for several instances automatically at startup — the in-process equivalent of
+the Cloud SQL Auth Proxy binary's `--instances` list — list them in `ConnectorOptions.Instances`.
+Registering the connector adds a hosted service that binds a listener per instance before the app
+serves requests.
 
 ```jsonc
 // appsettings.json
 {
   "CloudSql": {
     "Instances": [
-      "my-project:europe-west1:db-a",
-      "my-project:europe-west1:db-b"
+      "my-project:europe-west1:pg-a",            // -> 5432 (Postgres engine default)
+      "my-project:europe-west1:pg-b",            // -> 5433 (next free Postgres port)
+      "my-project:europe-west1:my-c",            // -> 3306 (MySQL engine default)
+      "my-project:europe-west1:pg-d?port=6000"   // -> 6000 (explicit override)
     ]
   }
 }
@@ -122,12 +124,32 @@ builder.Services.AddCloudSqlConnector(
     options => builder.Configuration.GetSection("CloudSql").Bind(options));
 ```
 
-Resolve a started proxy's loopback endpoint anywhere by calling `StartLocalProxyAsync` with the
-same instance name — it is idempotent and returns the already-running proxy:
+#### Port and address assignment (matches the binary)
+
+Port selection mirrors the Cloud SQL Auth Proxy binary exactly:
+
+- **Default** (`Port` unset): each instance uses its **database engine's default port** —
+  PostgreSQL `5432`, MySQL `3306`, SQL Server `1433` — incrementing per engine on collision. The
+  engine is detected from instance metadata at startup (one Admin API call per instance).
+- **`Port` set** (= `--port`): instances increment from that base (`6000`, `6001`, …), regardless
+  of engine, with no metadata lookup.
+- **Per-instance `?port=`** always wins and never consumes a counter.
+
+Other binary-compatible per-instance query overrides (combine with `&`):
+
+| Override | Global option | Effect |
+| --- | --- | --- |
+| `?address=0.0.0.0` | `Address` (default `127.0.0.1`) | Bind address for the listener |
+| `?port=6000` | `Port` | Explicit TCP port |
+| `?unix-socket=/dir` | `UnixSocketPath` | Unix domain socket in `/dir` (Postgres: `/dir/<instance>/.s.PGSQL.5432`) |
+| `?unix-socket-path=/dir/sock` | — | Unix domain socket at an exact path |
+
+Resolve a started TCP proxy's endpoint anywhere by calling `StartLocalProxyAsync` with the same
+instance name — it is idempotent and returns the already-running proxy:
 
 ```csharp
-var endpoint = await connector.StartLocalProxyAsync("my-project:europe-west1:db-a");
-// endpoint is the 127.0.0.1:<port> the proxy bound at startup.
+var endpoint = await connector.StartLocalProxyAsync("my-project:europe-west1:pg-a");
+// endpoint is the <address>:<port> the proxy bound at startup.
 ```
 
 ### Private IP / PSC

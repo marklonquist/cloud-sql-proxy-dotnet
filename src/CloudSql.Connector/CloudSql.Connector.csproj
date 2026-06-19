@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CloudSql.Connector.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Google.Apis.SQLAdmin.v1" />
     <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />

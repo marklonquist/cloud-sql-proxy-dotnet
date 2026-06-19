@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using CloudSql.Connector;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,59 +10,86 @@ namespace CloudSql.Connector.Tests;
 public class CloudSqlProxyStarterTests
 {
     [Fact]
-    public async Task ConfiguredInstances_StartProxiesAtHostStartup()
+    public async Task ExplicitPerInstancePorts_BindThoseExactPorts()
     {
-        var instances = new[]
-        {
-            "proj:europe-west1:db-a",
-            "proj:europe-west1:db-b",
-        };
+        var portA = GetFreePort();
+        var portB = GetFreePort();
 
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddCloudSqlConnector(options =>
+        await using var provider = BuildProvider(options =>
         {
-            foreach (var instance in instances)
-            {
-                options.Instances.Add(instance);
-            }
+            options.Instances.Add($"proj:europe-west1:db-a?port={portA}");
+            options.Instances.Add($"proj:europe-west1:db-b?port={portB}");
         });
 
-        await using var provider = services.BuildServiceProvider();
-
-        // Running the registered IHostedService binds a loopback listener per instance. The
-        // listener binds synchronously and does not dial the instance, so no network/credentials
-        // are required for this to succeed.
-        var hostedServices = provider.GetServices<IHostedService>();
-        foreach (var hosted in hostedServices)
-        {
-            await hosted.StartAsync(CancellationToken.None);
-        }
+        await StartHostedServicesAsync(provider);
 
         var connector = provider.GetRequiredService<CloudSqlConnector>();
-        foreach (var instance in instances)
+        var endpointA = await connector.StartLocalProxyAsync("proj:europe-west1:db-a");
+        var endpointB = await connector.StartLocalProxyAsync("proj:europe-west1:db-b");
+
+        Assert.Equal(IPAddress.Loopback, endpointA.Address);
+        Assert.Equal(portA, endpointA.Port);
+        Assert.Equal(portB, endpointB.Port);
+    }
+
+    [Fact]
+    public async Task GlobalPort_IncrementsAcrossInstances()
+    {
+        // No explicit per-instance ports, so a configured global base port avoids any metadata
+        // (network) lookup while still exercising the increment path.
+        var basePort = GetFreePort();
+
+        await using var provider = BuildProvider(options =>
         {
-            // StartLocalProxyAsync is idempotent: it returns the proxy already started at startup.
-            var endpoint = await connector.StartLocalProxyAsync(instance);
-            Assert.Equal(System.Net.IPAddress.Loopback, endpoint.Address);
-            Assert.True(endpoint.Port > 0);
-        }
+            options.Port = basePort;
+            options.Instances.Add("proj:europe-west1:db-a");
+            options.Instances.Add("proj:europe-west1:db-b");
+        });
+
+        await StartHostedServicesAsync(provider);
+
+        var connector = provider.GetRequiredService<CloudSqlConnector>();
+        var endpointA = await connector.StartLocalProxyAsync("proj:europe-west1:db-a");
+        var endpointB = await connector.StartLocalProxyAsync("proj:europe-west1:db-b");
+
+        Assert.Equal(basePort, endpointA.Port);
+        Assert.Equal(basePort + 1, endpointB.Port);
     }
 
     [Fact]
     public async Task NoConfiguredInstances_StartsCleanly()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddCloudSqlConnector();
+        await using var provider = BuildProvider(_ => { });
 
-        await using var provider = services.BuildServiceProvider();
-
-        var hostedServices = provider.GetServices<IHostedService>();
-        foreach (var hosted in hostedServices)
+        await StartHostedServicesAsync(provider);
+        foreach (var hosted in provider.GetServices<IHostedService>())
         {
-            await hosted.StartAsync(CancellationToken.None);
             await hosted.StopAsync(CancellationToken.None);
         }
+    }
+
+    private static ServiceProvider BuildProvider(Action<ConnectorOptions> configure)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddCloudSqlConnector(configure);
+        return services.BuildServiceProvider();
+    }
+
+    private static async Task StartHostedServicesAsync(IServiceProvider provider)
+    {
+        foreach (var hosted in provider.GetServices<IHostedService>())
+        {
+            await hosted.StartAsync(CancellationToken.None);
+        }
+    }
+
+    private static int GetFreePort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 }

@@ -79,6 +79,9 @@ public sealed class CloudSqlConnector : IAsyncDisposable
     /// <param name="instanceConnectionName">The <c>project:region:instance</c> name.</param>
     /// <param name="ipType">Which instance IP to dial; defaults to <see cref="ConnectorOptions.DefaultIpType"/>.</param>
     /// <param name="cancellationToken">Unused; present for API symmetry. The proxy outlives any single call.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The instance's proxy was configured to listen on a Unix domain socket rather than TCP.
+    /// </exception>
     public Task<IPEndPoint> StartLocalProxyAsync(
         string instanceConnectionName,
         IpType? ipType = null,
@@ -87,15 +90,50 @@ public sealed class CloudSqlConnector : IAsyncDisposable
         ThrowIfDisposed();
         var instance = InstanceConnectionName.Parse(instanceConnectionName);
         var effectiveIpType = ipType ?? _options.DefaultIpType;
-        var key = $"{instance.Original}|{effectiveIpType}";
 
-        var proxy = _proxies.GetOrAdd(key, _ => new Lazy<LocalProxyServer>(() =>
+        var proxy = GetOrStartProxy(instance, effectiveIpType, new IPEndPoint(IPAddress.Loopback, 0));
+        if (proxy.LocalEndPoint is IPEndPoint endpoint)
+        {
+            return Task.FromResult(endpoint);
+        }
+
+        throw new InvalidOperationException(
+            $"The proxy for '{instance.Original}' is bound to a Unix domain socket, not a TCP " +
+            "endpoint. Connect your driver to the socket path instead.");
+    }
+
+    /// <summary>
+    /// Starts (or returns the already-running) proxy for an instance bound to a specific local
+    /// endpoint. Used by the auto-start hosted service to honour configured ports/addresses/sockets.
+    /// </summary>
+    internal LocalProxyServer GetOrStartProxy(
+        InstanceConnectionName instance,
+        IpType ipType,
+        EndPoint bindEndpoint)
+    {
+        ThrowIfDisposed();
+        var key = $"{instance.Original}|{ipType}";
+
+        return _proxies.GetOrAdd(key, _ => new Lazy<LocalProxyServer>(() =>
             LocalProxyServer.Start(
-                ct => ConnectAsync(instanceConnectionName, effectiveIpType, ct),
+                ct => ConnectAsync(instance.Original, ipType, ct),
                 _loggerFactory.CreateLogger<LocalProxyServer>(),
-                instance.Original))).Value;
+                instance.Original,
+                bindEndpoint))).Value;
+    }
 
-        return Task.FromResult(proxy.Endpoint);
+    /// <summary>
+    /// Returns the instance's database engine version (for example <c>POSTGRES_15</c>) from its
+    /// Cloud SQL metadata, used to pick the engine's default listener port.
+    /// </summary>
+    internal async Task<string> GetEngineVersionAsync(
+        InstanceConnectionName instance,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        var admin = await _adminClient.Value.ConfigureAwait(false);
+        var settings = await admin.GetConnectSettingsAsync(instance, cancellationToken).ConfigureAwait(false);
+        return settings.DatabaseVersion ?? string.Empty;
     }
 
     /// <summary>
