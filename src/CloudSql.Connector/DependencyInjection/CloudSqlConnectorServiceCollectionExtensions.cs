@@ -1,5 +1,7 @@
 using CloudSql.Connector;
+using CloudSql.Connector.Internal;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +15,9 @@ public static class CloudSqlConnectorServiceCollectionExtensions
 {
     /// <summary>
     /// Registers a singleton <see cref="CloudSqlConnector"/>. Credentials are resolved lazily on
-    /// first use, so registration never blocks.
+    /// first use, so registration never blocks. Any instance names configured in
+    /// <see cref="ConnectorOptions.Instances"/> have a loopback proxy started for them
+    /// automatically when the host starts.
     /// </summary>
     public static IServiceCollection AddCloudSqlConnector(
         this IServiceCollection services,
@@ -30,6 +34,10 @@ public static class CloudSqlConnectorServiceCollectionExtensions
         services.TryAddSingleton(sp => CloudSqlConnector.Create(
             sp.GetRequiredService<IOptions<ConnectorOptions>>().Value,
             sp.GetService<ILoggerFactory>()));
+
+        // Eagerly start a loopback proxy for any instance listed in ConnectorOptions.Instances.
+        // AddHostedService dedupes by implementation type, so repeated registration is harmless.
+        services.AddHostedService<CloudSqlProxyStarter>();
 
         return services;
     }

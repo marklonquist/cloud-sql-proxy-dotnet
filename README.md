@@ -98,6 +98,38 @@ builder.Services.AddCloudSqlMySqlDataSource(
 
 Inject `NpgsqlDataSource` / `MySqlDataSource` (or a `DbConnection`) anywhere.
 
+### Auto-starting proxies from configuration
+
+To start a loopback proxy for several instances automatically at startup — the in-process
+equivalent of the Cloud SQL Auth Proxy binary's `--instances` list — list them in
+`ConnectorOptions.Instances`. Registering the connector adds a hosted service that binds a
+`127.0.0.1` listener per instance before the app serves requests.
+
+```jsonc
+// appsettings.json
+{
+  "CloudSql": {
+    "Instances": [
+      "my-project:europe-west1:db-a",
+      "my-project:europe-west1:db-b"
+    ]
+  }
+}
+```
+
+```csharp
+builder.Services.AddCloudSqlConnector(
+    options => builder.Configuration.GetSection("CloudSql").Bind(options));
+```
+
+Resolve a started proxy's loopback endpoint anywhere by calling `StartLocalProxyAsync` with the
+same instance name — it is idempotent and returns the already-running proxy:
+
+```csharp
+var endpoint = await connector.StartLocalProxyAsync("my-project:europe-west1:db-a");
+// endpoint is the 127.0.0.1:<port> the proxy bound at startup.
+```
+
 ### Private IP / PSC
 
 ```csharp

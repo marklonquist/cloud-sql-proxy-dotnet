@@ -14,6 +14,20 @@ public sealed class ConnectorOptions
     public IpType DefaultIpType { get; set; } = IpType.Public;
 
     /// <summary>
+    /// Instance connection names (<c>project:region:instance</c>) to start an in-process
+    /// loopback proxy for automatically at host startup, each on its own <c>127.0.0.1</c>
+    /// listener bound before the application begins serving requests. Resolve a started
+    /// proxy's endpoint with <see cref="CloudSqlConnector.StartLocalProxyAsync"/> (idempotent).
+    /// Empty by default.
+    /// <para>
+    /// This is the in-process equivalent of the Cloud SQL Auth Proxy binary's
+    /// <c>--instances</c> list and binds directly from configuration, for example an
+    /// <c>"Instances": [ "project:region:instance" ]</c> array in <c>appsettings.json</c>.
+    /// </para>
+    /// </summary>
+    public IList<string> Instances { get; } = new List<string>();
+
+    /// <summary>
     /// When <c>true</c>, the OAuth2 access token is embedded into the ephemeral client
     /// certificate and is expected to be used as the database password (Cloud SQL IAM
     /// database authentication). Defaults to <c>false</c>.
