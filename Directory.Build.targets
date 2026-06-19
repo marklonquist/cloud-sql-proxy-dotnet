@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Evaluated after each project body, so the project's own <IsPackable> override is visible. -->
+
+  <!-- Enforce public-API XML documentation only on shipped libraries. -->
+  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Embed the shared NuGet.org README into every produced package. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)docs/nuget-readme.md" Pack="true" PackagePath="\README.md" Visible="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CloudSql.Connector/CloudSql.Connector.csproj" />
+    <Project Path="src/CloudSql.Connector.Npgsql/CloudSql.Connector.Npgsql.csproj" />
+    <Project Path="src/CloudSql.Connector.MySqlConnector/CloudSql.Connector.MySqlConnector.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/CloudSql.Connector.Sample/CloudSql.Connector.Sample.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CloudSql.Connector.Tests/CloudSql.Connector.Tests.csproj" />
+  </Folder>
+</Solution>

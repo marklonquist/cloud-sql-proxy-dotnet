@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>CloudSql.Connector</PackageId>
+    <Description>In-process Google Cloud SQL connector for .NET. Establishes a secure mTLS connection to a Cloud SQL instance (Postgres, MySQL, SQL Server) directly from your application — no separate Cloud SQL Auth Proxy process or sidecar required. Handles instance metadata discovery, automatic ephemeral client-certificate rotation, IAM database authentication, and an in-process loopback endpoint any ADO.NET driver can connect to. AddCloudSqlConnector().</Description>
+    <RootNamespace>CloudSql.Connector</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.SQLAdmin.v1" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+# Normalize line endings to LF in the repository for all text files.
+* text=auto eol=lf
+
+# Binary assets (none yet, but keep git from munging common ones).
+*.png binary
+*.snk binary
+*.pfx binary

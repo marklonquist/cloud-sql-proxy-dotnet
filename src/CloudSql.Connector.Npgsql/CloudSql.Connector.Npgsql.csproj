@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>CloudSql.Connector.Npgsql</PackageId>
+    <Description>Npgsql integration for CloudSql.Connector. Builds an NpgsqlDataSource that connects to a Google Cloud SQL for PostgreSQL instance in-process over mTLS — no Cloud SQL Auth Proxy sidecar — with optional IAM database authentication. AddCloudSqlNpgsqlDataSource().</Description>
+    <RootNamespace>CloudSql.Connector.Npgsql</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudSql.Connector\CloudSql.Connector.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>
